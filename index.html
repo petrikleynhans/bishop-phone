@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bishop">
+<meta name="robots" content="noindex, nofollow">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<title>Bishop</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1b1b1a; --muted: #6b6a66; --line: #e2e0da;
+    --accent: #1f4e79; --accent-ink: #ffffff; --live: #b3261e; --ok: #2d6a3e; --bad: #9b2c2c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --panel: #1e1e1c; --ink: #ecebe7; --muted: #9a9892; --line: #33322f;
+      --accent: #6b9fd1; --accent-ink: #0d1b2a; --live: #f2867e; --ok: #7cc48f; --bad: #e58a8a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); }
+  h1 { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 4px 0 14px; }
+  .mic {
+    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+    padding: 22px; font: inherit; font-size: 20px; font-weight: 700; border-radius: 16px;
+    border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  }
+  .mic.live { background: var(--live); border-color: var(--live); color: #fff; }
+  .mic svg { width: 26px; height: 26px; }
+  textarea {
+    width: 100%; min-height: 120px; margin-top: 12px; padding: 14px; font: inherit; font-size: 18px; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; resize: vertical;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  button.plain {
+    font: inherit; font-weight: 600; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); padding: 14px 16px; cursor: pointer;
+  }
+  button.send { flex: 1; font-size: 18px; border-color: var(--ink); }
+  button:disabled { opacity: .5; }
+  .hint { color: var(--muted); font-size: 13px; margin: 10px 2px 18px; }
+  .log { display: flex; flex-direction: column; gap: 10px; }
+  .item { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .said { color: var(--muted); font-size: 14px; margin-bottom: 6px; }
+  .reply { white-space: pre-wrap; }
+  .reply.bad { color: var(--bad); }
+  .locked { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .siri { margin-top: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .siri h2 { font-size: 16px; margin: 0 0 10px; }
+  .siri ol { padding-left: 20px; margin: 12px 0 0; }
+  .siri li { margin-bottom: 6px; }
+  .siri button { width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bishop</h1>
+
+  <div id="locked" class="locked" hidden>
+    This device isn't linked yet. Open the link Bishop gave you (the QR code) once on this phone.
+  </div>
+
+  <div id="app" hidden>
+    <button class="mic" id="mic" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10v1a7 7 0 0 0 14 0v-1"></path><line x1="12" y1="18" x2="12" y2="22"></line>
+      </svg>
+      <span id="micLabel">Tap and talk</span>
+    </button>
+    <textarea id="text" placeholder="Or type here (the keyboard mic works too)."></textarea>
+    <div class="row">
+      <button class="plain send" id="send">Send</button>
+      <button class="plain" id="undo" title="Reverse the last thing Bishop did">Undo</button>
+      <button class="plain" id="status">Status</button>
+    </div>
+    <p class="hint">Check the words, then Send. Reminders → calendar · "add to today" → week list · content and level-up ideas → their banks. Nothing gets sent to anyone.</p>
+    <div class="log" id="log"></div>
+
+    <div class="siri" id="siri" hidden>
+      <h2>Hands-free: "Hey Siri, Bishop"</h2>
+      <button class="plain" id="copyLink">1. Copy my Shortcut link</button>
+      <ol>
+        <li>Open <b>Shortcuts</b> → <b>+</b>. Name it <b>Bishop</b>.</li>
+        <li>Add <b>Dictate Text</b>.</li>
+        <li>Add <b>Get Contents of URL</b>. Paste the link as the URL. Tap ▸: Method <b>POST</b>, Request Body <b>JSON</b>, add a Text field: key <b>text</b>, value <b>Dictated Text</b>.</li>
+        <li>Add <b>Get Dictionary Value</b>: key <b>reply</b>.</li>
+        <li>Add <b>Speak Text</b>.</li>
+      </ol>
+      <p class="hint">Then: "Hey Siri, Bishop" → speak → Siri reads back what was filed.</p>
+    </div>
+  </div>
+</main>
+<script>
+  var ENDPOINT = 'https://script.google.com/macros/s/AKfycbzcrTU3c1JRiYIoPhMF1euozcPLycO2oK_xSONvhXmOCXBklpWpn3Z_4cg36uecF01g-Q/exec';
+  var KEY_STORE = 'bishop-key';
+  var LOG_STORE = 'bishop-log';
+
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+  // The key arrives once in the URL fragment (#k=…), which never reaches any server.
+  // It is kept on this phone and wiped from the address bar.
+  var m = location.hash.match(/k=([\w-]+)/);
+  if (m) { store(KEY_STORE, m[1]); history.replaceState(null, '', location.pathname); }
+  var KEY = store(KEY_STORE);
+
+  var text = document.getElementById('text');
+  var sendBtn = document.getElementById('send');
+  var buttons = [sendBtn, document.getElementById('undo'), document.getElementById('status')];
+  document.getElementById(KEY ? 'app' : 'locked').hidden = false;
+
+  function readLog() { try { return JSON.parse(store(LOG_STORE) || '[]'); } catch (e) { return []; } }
+  function render(items) {
+    var log = document.getElementById('log');
+    log.innerHTML = '';
+    items.forEach(function (it) {
+      var div = document.createElement('div'); div.className = 'item';
+      var said = document.createElement('div'); said.className = 'said'; said.textContent = it.at + ' — ' + it.said;
+      var reply = document.createElement('div'); reply.className = 'reply' + (it.ok ? '' : ' bad'); reply.textContent = it.reply;
+      div.appendChild(said); div.appendChild(reply); log.appendChild(div);
+    });
+  }
+  function remember(entry) {
+    var items = readLog(); items.unshift(entry);
+    store(LOG_STORE, JSON.stringify(items.slice(0, 15))); render(items);
+  }
+  function busy(on) {
+    buttons.forEach(function (b) { b.disabled = on; });
+    sendBtn.textContent = on ? 'Working…' : 'Send';
+  }
+
+  function go(said) {
+    said = said.trim();
+    if (!said) return;
+    busy(true);
+    var at = new Date().toTimeString().slice(0, 5);
+    // text/plain keeps this a "simple" request: no CORS preflight, which Apps Script can't answer.
+    fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ key: KEY, action: 'capture', text: said }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        var reply = res.reply || res.error || 'No reply.';
+        remember({ at: at, said: said, reply: reply, ok: !!res.ok });
+        if (res.ok && text.value.trim() === said) text.value = '';
+      })
+      .catch(function (err) {
+        remember({ at: at, said: said, reply: 'Could not reach Bishop (' + err.message + '). Your words are still in the box — resend.', ok: false });
+      })
+      .then(function () { busy(false); });
+  }
+
+  sendBtn.onclick = function () { go(text.value); };
+  buttons[1].onclick = function () { go('/undo'); };
+  buttons[2].onclick = function () { go('/status'); };
+
+  // iPhone: Safari's speech recognition hangs (found live 2026-10-02 — never ends, can't be
+  // stopped), so iPhone gets the keyboard mic plus the Siri Shortcut instead of the button.
+  var IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (IOS && KEY) {
+    document.getElementById('siri').hidden = false;
+    text.placeholder = 'Tap here, then the mic on your keyboard.';
+    var copyBtn = document.getElementById('copyLink');
+    copyBtn.onclick = function () {
+      var link = ENDPOINT + '?k=' + KEY;
+      var done = function () { copyBtn.textContent = '✓ Copied — paste it into Get Contents of URL'; };
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, function () { prompt('Copy this link:', link); });
+      else prompt('Copy this link:', link);
+    };
+  }
+
+  // Mic button: the browser's own speech recognition (Android Chrome, desktop).
+  var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (Rec && KEY && !IOS) {
+    var mic = document.getElementById('mic');
+    var micLabel = document.getElementById('micLabel');
+    var rec = null;
+    var safety = null;
+    var reset = function (label) {
+      if (rec) { try { rec.abort(); } catch (e) {} }
+      rec = null;
+      clearTimeout(safety);
+      mic.classList.remove('live');
+      micLabel.textContent = label || 'Tap and talk';
+    };
+    mic.hidden = false;
+    mic.onclick = function () {
+      if (rec) { reset(); return; } // stop never waits on the browser
+      rec = new Rec();
+      rec.lang = 'en-ZA';
+      rec.interimResults = true;
+      rec.continuous = false;
+      var base = text.value ? text.value.replace(/\s*$/, ' ') : '';
+      rec.onresult = function (e) {
+        var heard = '';
+        for (var i = 0; i < e.results.length; i++) heard += e.results[i][0].transcript;
+        text.value = base + heard;
+      };
+      rec.onerror = function (e) {
+        reset(e.error === 'not-allowed' ? 'Mic blocked — allow it in settings, or type' : 'Tap and talk');
+      };
+      rec.onend = function () { if (rec) reset(); };
+      mic.classList.add('live');
+      micLabel.textContent = 'Listening… tap to stop';
+      safety = setTimeout(function () { reset(); }, 30000);
+      rec.start();
+    };
+  }
+
+  render(readLog());
+</script>
+</body>
+</html>
